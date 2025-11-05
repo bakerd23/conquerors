@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VT Men's Basketball Hustle Input — Makes/Misses</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    html, body { margin:0; padding:0; height:100%; }
+    .dark-mode { background-color: #111827 !important; }
+    .light-mode { background-color: #f9fafb !important; }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  </style>
+</head>
+<body class="dark-mode">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useCallback, useEffect } = React;
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCGk-hxgCxmFEC3p66gMDZp2VF7wd88XqI",
+      authDomain: "conquerors-shooting.firebaseapp.com",
+      projectId: "conquerors-shooting",
+      storageBucket: "conquerors-shooting.firebasestorage.app",
+      messagingSenderId: "1094564414431",
+      appId: "1:1094564414431:web:8883a3bb1a136bb920ba6a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const players = [
+      { number: 0, lastName: "Bedford", firstName: "Jailen" },
+      { number: 1, lastName: "Lawal", firstName: "Tobi" },
+      { number: 2, lastName: "Schutt", firstName: "Jaden" },
+      { number: 3, lastName: "Hammond", firstName: "Ben" },
+      { number: 4, lastName: "Pasha", firstName: "Izaiah" }
+    ];
+
+    const CATEGORIES = {
+      "Makes": ["Layup", "Extended", "2 Jumpshot", "3 Jumpshot"],
+      "Misses": ["Layup", "Extended", "2 Jumpshot", "3 Jumpshot"]
+    };
+
+    const App = () => {
+      const [practiceDate, setPracticeDate] = useState(new Date().toISOString().split('T')[0]);
+      const [selectedPlayer, setSelectedPlayer] = useState(null);
+      const [playerStats, setPlayerStats] = useState({});
+      const [saveStatus, setSaveStatus] = useState('saved');
+      const [darkMode, setDarkMode] = useState(true);
+
+      useEffect(() => { document.body.className = darkMode ? 'dark-mode' : 'light-mode'; }, [darkMode]);
+
+      const getPlayerKey = (num) => `${practiceDate}-${num}`;
+      const getStatValue = useCallback((num, cat, stat) => playerStats[getPlayerKey(num)]?.[`${cat}:${stat}`] || 0, [playerStats, practiceDate]);
+
+      const loadExisting = useCallback(async () => {
+        try {
+          const docRef = db.collection('practiceSummaries').doc(practiceDate);
+          const snap = await docRef.get();
+          if (!snap.exists) { setPlayerStats({}); return; }
+          const data = snap.data();
+          const loaded = {};
+          Object.entries(data.playerStats || {}).forEach(([k, stats]) => {
+            const num = parseInt(k.replace('player_', ''));
+            loaded[getPlayerKey(num)] = { ...stats };
+          });
+          setPlayerStats(loaded);
+        } catch (e) { console.error(e); }
+      }, [practiceDate]);
+
+      useEffect(() => { loadExisting(); }, [loadExisting]);
+
+      const saveEvent = useCallback(async (ev) => {
+        try {
+          setSaveStatus('saving');
+          await db.collection('hustleEvents').add({ ...ev, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+          const docRef = db.collection('practiceSummaries').doc(practiceDate);
+          const snap = await docRef.get();
+          const playerKey = `player_${ev.playerNumber}`;
+          const statKey = `${ev.category}:${ev.stat}`;
+          if (snap.exists) {
+            const current = snap.data();
+            const curPlayer = current.playerStats?.[playerKey] || {};
+            const newVal = Math.max(0, (curPlayer[statKey] || 0) + ev.change);
+            await docRef.update({
+              [`playerStats.${playerKey}.${statKey}`]: newVal,
+              lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          } else {
+            await docRef.set({
+              practiceDate,
+              playerStats: { [playerKey]: { [statKey]: Math.max(0, ev.change) } },
+              lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }
+          setSaveStatus('saved');
+        } catch (e) { console.error(e); setSaveStatus('error'); setTimeout(() => setSaveStatus('saved'), 3000); }
+      }, [practiceDate]);
+
+      const updateStat = useCallback((num, cat, stat, delta) => {
+        const key = getPlayerKey(num);
+        setPlayerStats(prev => {
+          const next = { ...prev };
+          next[key] = { ...(next[key] || {}) };
+          const sKey = `${cat}:${stat}`;
+          const cur = next[key][sKey] || 0;
+          next[key][sKey] = Math.max(0, cur + delta);
+          return next;
+        });
+        const ev = {
+          practiceDate,
+          playerNumber: num,
+          playerName: players.find(p => p.number === num)?.lastName || 'Unknown',
+          firstName: players.find(p => p.number === num)?.firstName || '',
+          category: cat,
+          stat,
+          change: delta,
+          timestamp: new Date().toISOString()
+        };
+        saveEvent(ev);
+      }, [practiceDate, saveEvent]);
+
+      const Status = () => {
+        const map = {
+          saving: { color: 'text-yellow-600', dot: 'bg-yellow-500', text: 'Saving…' },
+          error:  { color: 'text-red-600',    dot: 'bg-red-500',    text: 'Save error' },
+          saved:  { color: 'text-green-600',  dot: 'bg-green-500',  text: 'Saved to cloud' }
+        }[saveStatus];
+        return (
+          <div className={`flex items-center gap-2 text-sm ${map.color} min-w-32`}>
+            <div className={`w-2 h-2 ${map.dot} rounded-full ${saveStatus==='saving' ? 'animate-pulse':''}`}></div>
+            <span>{map.text}</span>
+          </div>
+        );
+      };
+
+      const StatRow = ({ num, cat, stat }) => {
+        const v = getStatValue(num, cat, stat);
+        const isMiss = cat === 'Misses';
+        return (
+          <div className={`flex items-center justify-between p-3 rounded-lg border ${isMiss ? (darkMode ? 'bg-red-900/50 border-red-800' : 'bg-red-50 border-red-200') : (darkMode ? 'bg-green-900/50 border-green-800' : 'bg-green-50 border-green-200')}`}>
+            <div className={`text-sm font-medium ${isMiss ? (darkMode ? 'text-red-300' : 'text-red-800') : (darkMode ? 'text-green-300' : 'text-green-800')}`}>{stat}</div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => updateStat(num, cat, stat, -1)} disabled={v===0} className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${v===0 ? 'bg-gray-300 cursor-not-allowed' : (isMiss ? 'bg-green-500 hover:bg-green-600 active:bg-green-700' : 'bg-red-500 hover:bg-red-600 active:bg-red-700')}`}>−</button>
+              <div className={`${isMiss ? (darkMode ? 'text-red-300' : 'text-red-700') : (darkMode ? 'text-green-300' : 'text-green-700')} w-12 text-center font-bold text-lg`}>{v}</div>
+              <button onClick={() => updateStat(num, cat, stat, 1)} className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${isMiss ? 'bg-red-500 hover:bg-red-600 active:bg-red-700' : 'bg-green-500 hover:bg-green-600 active:bg-green-700'}`}>+</button>
+            </div>
+          </div>
+        );
+      };
+
+      return (
+        <div className="max-w-6xl mx-auto p-4 min-h-screen">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              <h1 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-2xl font-bold`}>Hustle Input — Makes/Misses</h1>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setDarkMode(p=>!p)} className={`${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'} px-3 py-2 rounded-md`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+                <div className="flex items-center gap-2">
+                  <label className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium`}>Practice Date:</label>
+                  <input type="date" value={practiceDate} onChange={e=>setPracticeDate(e.target.value)} className={`${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'} px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`} />
+                </div>
+                <Status />
+              </div>
+            </div>
+          </div>
+
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
+            <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>Select Player</h2>
+            <div className="grid grid-cols-7 gap-3">
+              {players.map(p => (
+                <button key={p.number} onClick={() => setSelectedPlayer(p.number)} className={`p-4 rounded-lg border-2 transition-all font-semibold text-lg ${selectedPlayer===p.number ? 'border-blue-500 bg-blue-100 text-blue-800 shadow-md scale-105' : (darkMode ? 'border-gray-600 bg-gray-700 text-gray-200 hover:border-gray-500 hover:bg-gray-600' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50')}`}>
+                  <div className="text-2xl font-bold">{p.number}</div>
+                  <div className="text-sm">{p.lastName}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {selectedPlayer !== null ? (
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
+              <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>
+                Stats for {players.find(x=>x.number===selectedPlayer)?.firstName} {players.find(x=>x.number===selectedPlayer)?.lastName}
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {Object.entries(CATEGORIES).map(([cat, stats]) => (
+                  <div key={cat} className="space-y-3">
+                    <h3 className={`${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg`}>{cat}</h3>
+                    {stats.map(stat => (
+                      <StatRow key={`${cat}-${stat}`} num={selectedPlayer} cat={cat} stat={stat} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-12 text-center`}>
+              <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-lg`}>Select a player to start</div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
