@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VT Men's Basketball Game Input — Makes/Misses</title>
+  <title>Conquerors Basketball Gameday</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -40,20 +40,20 @@
     auth.onAuthStateChanged(u => { if (!u) auth.signInAnonymously().catch(console.error); });
 
     const players = [
-      { id: 1,  number: 1,  firstName: "Gabriel", lastName: "" },
-      { id: 2,  number: 2,  firstName: "Josiah",  lastName: "" },
-      { id: 3,  number: 3,  firstName: "Mason",   lastName: "" },
-      { id: 4,  number: 4,  firstName: "Gabe",    lastName: "" },
-      { id: 12, number: 12, firstName: "Kale",    lastName: "" },
-      { id: 15, number: 15, firstName: "Machen",  lastName: "" },
-      { id: 20, number: 20, firstName: "James",   lastName: "" },
-      { id: 21, number: 21, firstName: "Titus",   lastName: "" },
-      { id: 22, number: 22, firstName: "Charlie", lastName: "" },
-      { id: 23, number: 23, firstName: "Rylan",   lastName: "" },
-      { id: 33, number: 33, firstName: "Zach",    lastName: "" },
-      { id: 35, number: 35, firstName: "Seth",    lastName: "" },
-      { id: 40, number: 40, firstName: "Cole",    lastName: "" },
-      { id: 41, number: 41, firstName: "Bradley", lastName: "" }
+      { id: 1,  number: 1,  firstName: "Gabriel"},
+      { id: 2,  number: 2,  firstName: "Josiah"},
+      { id: 3,  number: 3,  firstName: "Mason"},
+      { id: 4,  number: 4,  firstName: "Gabe"},
+      { id: 12, number: 12, firstName: "Kale"},
+      { id: 15, number: 15, firstName: "Machen"},
+      { id: 20, number: 20, firstName: "James"},
+      { id: 21, number: 21, firstName: "Titus"},
+      { id: 22, number: 22, firstName: "Charlie"},
+      { id: 23, number: 23, firstName: "Rylan"},
+      { id: 33, number: 33, firstName: "Zach"},
+      { id: 35, number: 35, firstName: "Seth"},
+      { id: 40, number: 40, firstName: "Cole"},
+      { id: 41, number: 41, firstName: "Bradley"}
     ];
 
     const SHOT_CATEGORIES = {
@@ -198,7 +198,6 @@
           opponent,
           playerId: id,
           playerNumber: p.number || String(id),
-          playerName: p.lastName || 'Unknown',
           firstName: p.firstName || '',
           category: cat,
           stat,
@@ -319,7 +318,7 @@
                       {players.map(p => (
                         <button key={p.id} onClick={() => setSelectedPlayer(p.id)} className={`p-4 rounded-lg border-2 transition-all font-semibold text-lg ${selectedPlayer===p.id ? 'border-blue-500 bg-blue-100 text-blue-800 shadow-md scale-105' : (darkMode ? 'border-gray-600 bg-gray-700 text-gray-200 hover:border-gray-500 hover:bg-gray-600' : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50')}`}>
                           <div className="text-2xl font-bold">{p.number}</div>
-                          <div className="text-sm">{p.lastName || p.firstName}</div>
+                          <div className="text-sm">{p.firstName}</div>
                         </button>
                       ))}
                     </div>
@@ -347,7 +346,7 @@
               {activeTab === 'shots' && selectedPlayer !== null && (
                 <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
                   <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>
-                    Stats for {players.find(x=>x.id===selectedPlayer)?.firstName} {players.find(x=>x.id===selectedPlayer)?.lastName}
+                    Stats for {players.find(x=>x.id===selectedPlayer)?.firstName}
                   </h2>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {Object.entries(SHOT_CATEGORIES).map(([cat, stats]) => (
