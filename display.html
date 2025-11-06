@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VT Men's Basketball Game Stats Viewer</title>
+  <title>Conquerors Gameday Stats Viewer</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -40,27 +40,27 @@
     auth.onAuthStateChanged(u => { if (!u) auth.signInAnonymously().catch(console.error); });
 
     const players = [
-      { id: 1,  number: 1,  firstName: "Gabriel", lastName: "" },
-      { id: 2,  number: 2,  firstName: "Josiah",  lastName: "" },
-      { id: 3,  number: 3,  firstName: "Mason",   lastName: "" },
-      { id: 4,  number: 4,  firstName: "Gabe",    lastName: "" },
-      { id: 12, number: 12, firstName: "Kale",    lastName: "" },
-      { id: 15, number: 15, firstName: "Machen",  lastName: "" },
-      { id: 20, number: 20, firstName: "James",   lastName: "" },
-      { id: 21, number: 21, firstName: "Titus",   lastName: "" },
-      { id: 22, number: 22, firstName: "Charlie", lastName: "" },
-      { id: 23, number: 23, firstName: "Rylan",   lastName: "" },
-      { id: 33, number: 33, firstName: "Zach",    lastName: "" },
-      { id: 35, number: 35, firstName: "Seth",    lastName: "" },
-      { id: 40, number: 40, firstName: "Cole",    lastName: "" },
-      { id: 41, number: 41, firstName: "Bradley", lastName: "" }
+      { id: 1,  number: 1,  firstName: "Gabriel"},
+      { id: 2,  number: 2,  firstName: "Josiah"},
+      { id: 3,  number: 3,  firstName: "Mason"},
+      { id: 4,  number: 4,  firstName: "Gabe"},
+      { id: 12, number: 12, firstName: "Kale"},
+      { id: 15, number: 15, firstName: "Machen"},
+      { id: 20, number: 20, firstName: "James"},
+      { id: 21, number: 21, firstName: "Titus"},
+      { id: 22, number: 22, firstName: "Charlie"},
+      { id: 23, number: 23, firstName: "Rylan"},
+      { id: 33, number: 33, firstName: "Zach"},
+      { id: 35, number: 35, firstName: "Seth"},
+      { id: 40, number: 40, firstName: "Cole"},
+      { id: 41, number: 41, firstName: "Bradley"}
     ];
 
     const AREAS = [
       { key: "Paint", label: "Paint", points: 2 },
       { key: "Mid-Range", label: "Mid-Range", points: 2 },
-      { key: "Corner 3", label: "Corner 3", points: 3 },
-      { key: "Above Break 3", label: "Above Break 3", points: 3 },
+      { key: "2 Jumpshot", label: "2 Jumpshot", points: 2 },
+      { key: "3 Jumpshot", label: "3 Jumpshot", points: 3 },
       { key: "Free Throw", label: "Free Throw", points: 1 }
     ];
 
