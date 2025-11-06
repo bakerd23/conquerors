@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VT Men's Basketball Game Stats Viewer</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    html,body{margin:0;padding:0;height:100%}
+    .dark-mode{background-color:#111827!important}
+    .light-mode{background-color:#f9fafb!important}
+    th{cursor:pointer;user-select:none}
+    th:hover{background-color:rgba(59,130,246,0.1)}
+  </style>
+</head>
+<body class="dark-mode">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const {useState, useCallback, useEffect} = React;
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCGk-hxgCxmFEC3p66gMDZp2VF7wd88XqI",
+      authDomain: "conquerors-shooting.firebaseapp.com",
+      projectId: "conquerors-shooting",
+      storageBucket: "conquerors-shooting.firebasestorage.app",
+      messagingSenderId: "1094564414431",
+      appId: "1:1094564414431:web:8883a3bb1a136bb920ba6a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    auth.onAuthStateChanged(u => { if (!u) auth.signInAnonymously().catch(console.error); });
+
+    const players = [
+      { id: 1,  number: 1,  firstName: "Gabriel", lastName: "" },
+      { id: 2,  number: 2,  firstName: "Josiah",  lastName: "" },
+      { id: 3,  number: 3,  firstName: "Mason",   lastName: "" },
+      { id: 4,  number: 4,  firstName: "Gabe",    lastName: "" },
+      { id: 12, number: 12, firstName: "Kale",    lastName: "" },
+      { id: 15, number: 15, firstName: "Machen",  lastName: "" },
+      { id: 20, number: 20, firstName: "James",   lastName: "" },
+      { id: 21, number: 21, firstName: "Titus",   lastName: "" },
+      { id: 22, number: 22, firstName: "Charlie", lastName: "" },
+      { id: 23, number: 23, firstName: "Rylan",   lastName: "" },
+      { id: 33, number: 33, firstName: "Zach",    lastName: "" },
+      { id: 35, number: 35, firstName: "Seth",    lastName: "" },
+      { id: 40, number: 40, firstName: "Cole",    lastName: "" },
+      { id: 41, number: 41, firstName: "Bradley", lastName: "" }
+    ];
+
+    const AREAS = [
+      { key: "Paint", label: "Paint", points: 2 },
+      { key: "Mid-Range", label: "Mid-Range", points: 2 },
+      { key: "Corner 3", label: "Corner 3", points: 3 },
+      { key: "Above Break 3", label: "Above Break 3", points: 3 }
+    ];
+
+    const App = () => {
+      const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
+      const [opponent, setOpponent] = useState('');
+      const [games, setGames] = useState([]);
+      const [gameData, setGameData] = useState(null);
+      const [darkMode, setDarkMode] = useState(true);
+      const [sortConfig, setSortConfig] = useState({ key: null, direction: 'desc' });
+
+      useEffect(() => { document.body.className = darkMode ? 'dark-mode' : 'light-mode'; }, [darkMode]);
+
+      const loadGames = useCallback(async () => {
+        try {
+          const snapshot = await db.collection('gameSummaries').get();
+          const gamesList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setGames(gamesList);
+        } catch (e) { console.error(e); }
+      }, []);
+
+      useEffect(() => { loadGames(); }, [loadGames]);
+
+      const loadGameData = useCallback(async () => {
+        if (!opponent) return;
+        try {
+          const gameId = `${gameDate}-${opponent.replace(/\s+/g, '-').toLowerCase()}`;
+          const docRef = db.collection('gameSummaries').doc(gameId);
+          const snap = await docRef.get();
+          if (snap.exists) {
+            setGameData(snap.data());
+          } else {
+            setGameData(null);
+          }
+        } catch (e) { 
+          console.error(e); 
+          setGameData(null);
+        }
+      }, [gameDate, opponent]);
+
+      useEffect(() => { loadGameData(); }, [loadGameData]);
+
+      const getPlayerStats = () => {
+        if (!gameData || !gameData.playerStats) return [];
+        
+        const stats = [];
+        Object.entries(gameData.playerStats).forEach(([playerKey, playerData]) => {
+          const playerId = parseInt(playerKey.replace('player_', ''), 10);
+          const player = players.find(p => p.id === playerId);
+          if (!player) return;
+
+          const playerName = `${player.firstName} ${player.lastName}`.trim() || `#${player.number}`;
+          const row = { playerId, playerName, number: player.number };
+
+          AREAS.forEach(area => {
+            const makes = playerData[`Makes:${area.key}`] || 0;
+            const misses = playerData[`Misses:${area.key}`] || 0;
+            const attempts = makes + misses;
+            const pct = attempts > 0 ? (makes / attempts * 100) : 0;
+            const pps = attempts > 0 ? (makes / attempts * area.points) : 0;
+            
+            row[area.key] = { makes, attempts, pct, pps, points: area.points };
+          });
+
+          stats.push(row);
+        });
+
+        return stats;
+      };
+
+      const getTeamPPS = (area) => {
+        const stats = getPlayerStats();
+        let totalMakes = 0;
+        let totalAttempts = 0;
+        
+        stats.forEach(player => {
+          const areaStats = player[area.key];
+          if (areaStats) {
+            totalMakes += areaStats.makes;
+            totalAttempts += areaStats.attempts;
+          }
+        });
+
+        if (totalAttempts === 0) return 0;
+        return (totalMakes / totalAttempts) * area.points;
+      };
+
+      const getAveragePPS = () => {
+        const stats = getPlayerStats();
+        let totalPoints = 0;
+        let totalAttempts = 0;
+
+        stats.forEach(player => {
+          AREAS.forEach(area => {
+            const areaStats = player[area.key];
+            if (areaStats && areaStats.attempts > 0) {
+              totalPoints += areaStats.makes * areaStats.points;
+              totalAttempts += areaStats.attempts;
+            }
+          });
+        });
+
+        return totalAttempts > 0 ? totalPoints / totalAttempts : 0;
+      };
+
+      const getGoodBadShots = () => {
+        const stats = getPlayerStats();
+        const avgPPS = getAveragePPS();
+        const good = [];
+        const bad = [];
+
+        stats.forEach(player => {
+          AREAS.forEach(area => {
+            const areaStats = player[area.key];
+            if (areaStats && areaStats.attempts > 0) {
+              const shot = {
+                playerName: player.playerName,
+                area: area.label,
+                pps: areaStats.pps,
+                makes: areaStats.makes,
+                attempts: areaStats.attempts,
+                pct: areaStats.pct
+              };
+
+              if (areaStats.pps > avgPPS) {
+                good.push(shot);
+              } else if (areaStats.pps < avgPPS) {
+                bad.push(shot);
+              }
+            }
+          });
+        });
+
+        good.sort((a, b) => b.pps - a.pps);
+        bad.sort((a, b) => a.pps - b.pps);
+
+        return { good, bad };
+      };
+
+      const getTeamStats = () => {
+        if (!gameData || !gameData.teamStats) return null;
+
+        const conquers = {
+          offReb: gameData.teamStats['Conquerors:Offensive Rebound'] || 0,
+          defReb: gameData.teamStats['Conquerors:Defensive Rebound'] || 0,
+          turnovers: gameData.teamStats['Conquerors:Turnover'] || 0
+        };
+
+        const opponent = {
+          offReb: gameData.teamStats['Opponent:Offensive Rebound'] || 0,
+          defReb: gameData.teamStats['Opponent:Defensive Rebound'] || 0,
+          turnovers: gameData.teamStats['Opponent:Turnover'] || 0
+        };
+
+        const totalOffReb = conquers.offReb + opponent.defReb;
+        const totalDefReb = conquers.defReb + opponent.offReb;
+
+        conquers.offRebPct = totalOffReb > 0 ? (conquers.offReb / totalOffReb * 100) : 0;
+        conquers.defRebPct = totalDefReb > 0 ? (conquers.defReb / totalDefReb * 100) : 0;
+        opponent.offRebPct = totalOffReb > 0 ? (opponent.offReb / totalOffReb * 100) : 0;
+        opponent.defRebPct = totalDefReb > 0 ? (opponent.defReb / totalDefReb * 100) : 0;
+
+        return { conquers, opponent };
+      };
+
+      const sortData = (data, key) => {
+        if (!data || data.length === 0) return data;
+
+        const direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
+        setSortConfig({ key, direction });
+
+        return [...data].sort((a, b) => {
+          let aVal, bVal;
+
+          if (key === 'playerName') {
+            aVal = a.playerName;
+            bVal = b.playerName;
+          } else {
+            // Sorting by area stats
+            const [area, type] = key.split('-');
+            const areaData = AREAS.find(ar => ar.key === area);
+            if (!areaData) return 0;
+
+            const aStats = a[area];
+            const bStats = b[area];
+
+            if (!aStats || aStats.attempts === 0) aVal = -1;
+            else if (type === 'makes') aVal = aStats.makes;
+            else if (type === 'pct') aVal = aStats.pct;
+
+            if (!bStats || bStats.attempts === 0) bVal = -1;
+            else if (type === 'makes') bVal = bStats.makes;
+            else if (type === 'pct') bVal = bStats.pct;
+          }
+
+          if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+          if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      };
+
+      const SortIcon = ({ columnKey }) => {
+        if (sortConfig.key !== columnKey) return <span className="text-gray-400 ml-1">⇅</span>;
+        return sortConfig.direction === 'desc' ? <span className="ml-1">↓</span> : <span className="ml-1">↑</span>;
+      };
+
+      const playerStats = getPlayerStats();
+      const [sortedStats, setSortedStats] = useState(playerStats);
+
+      useEffect(() => {
+        setSortedStats(playerStats);
+      }, [gameData]);
+
+      const handleSort = (key) => {
+        const sorted = sortData(sortedStats, key);
+        setSortedStats(sorted);
+      };
+
+      const { good, bad } = getGoodBadShots();
+      const teamStats = getTeamStats();
+
+      return (
+        <div className="max-w-7xl mx-auto p-4 min-h-screen">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h1 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-2xl font-bold`}>Game Stats Viewer</h1>
+                <button onClick={() => setDarkMode(p=>!p)} className={`${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'} px-3 py-2 rounded-md`}>{darkMode ? '☀️ Light' : '🌙 Dark'}</button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex items-center gap-2 flex-1">
+                  <label className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium whitespace-nowrap`}>Game Date:</label>
+                  <input type="date" value={gameDate} onChange={e=>setGameDate(e.target.value)} className={`${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'} px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1`} />
+                </div>
+                <div className="flex items-center gap-2 flex-1">
+                  <label className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium whitespace-nowrap`}>Opponent:</label>
+                  <input type="text" value={opponent} onChange={e=>setOpponent(e.target.value)} placeholder="Enter opponent name" className={`${darkMode ? 'border-gray-600 bg-gray-700 text-white placeholder-gray-400' : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'} px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1`} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!opponent || !gameData ? (
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-12 text-center`}>
+              <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-lg`}>
+                {!opponent ? 'Enter opponent name to view stats' : 'No data found for this game'}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Player Box Score */}
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6 overflow-x-auto`}>
+                <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>Player Box Score</h2>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} border-b-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                      <th onClick={() => handleSort('playerName')} className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} p-2 text-left font-semibold`}>
+                        Player <SortIcon columnKey="playerName" />
+                      </th>
+                      {AREAS.map(area => (
+                        <th key={area.key} colSpan="2" className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} p-2 text-center font-semibold border-l ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                          {area.label} ({getTeamPPS(area).toFixed(2)})
+                        </th>
+                      ))}
+                    </tr>
+                    <tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} border-b ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                      <th className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} p-2 text-left text-xs`}></th>
+                      {AREAS.map(area => (
+                        <React.Fragment key={`${area.key}-headers`}>
+                          <th onClick={() => handleSort(`${area.key}-makes`)} className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} p-2 text-center text-xs border-l ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                            Makes-Att <SortIcon columnKey={`${area.key}-makes`} />
+                          </th>
+                          <th onClick={() => handleSort(`${area.key}-pct`)} className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} p-2 text-center text-xs`}>
+                            % <SortIcon columnKey={`${area.key}-pct`} />
+                          </th>
+                        </React.Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedStats.map(player => (
+                      <tr key={player.playerId} className={`${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'} border-b`}>
+                        <td className={`${darkMode ? 'text-gray-200' : 'text-gray-800'} p-2 font-medium`}>{player.playerName}</td>
+                        {AREAS.map(area => {
+                          const stats = player[area.key];
+                          const hasAttempts = stats && stats.attempts > 0;
+                          return (
+                            <React.Fragment key={`${player.playerId}-${area.key}`}>
+                              <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-2 text-center border-l ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                {hasAttempts ? `${stats.makes}-${stats.attempts}` : '-'}
+                              </td>
+                              <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-2 text-center`}>
+                                {hasAttempts ? `${stats.pct.toFixed(1)}%` : '-'}
+                              </td>
+                            </React.Fragment>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Good Shots / Bad Shots */}
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
+                <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>
+                  Shot Quality Analysis (Team Avg: {getAveragePPS().toFixed(2)} PPS)
+                </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className={`${darkMode ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg mb-3`}>
+                      Good Shots (Above Average)
+                    </h3>
+                    <div className="space-y-2">
+                      {good.length === 0 ? (
+                        <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-4`}>No shots above average</div>
+                      ) : (
+                        good.map((shot, idx) => (
+                          <div key={idx} className={`${darkMode ? 'bg-green-900/30 border-green-800' : 'bg-green-50 border-green-200'} border rounded-lg p-3`}>
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className={`${darkMode ? 'text-green-300' : 'text-green-800'} font-semibold`}>{shot.playerName}</div>
+                                <div className={`${darkMode ? 'text-green-400' : 'text-green-700'} text-sm`}>{shot.area}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`${darkMode ? 'text-green-300' : 'text-green-800'} font-bold`}>{shot.pps.toFixed(2)} PPS</div>
+                                <div className={`${darkMode ? 'text-green-400' : 'text-green-700'} text-sm`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className={`${darkMode ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg mb-3`}>
+                      Bad Shots (Below Average)
+                    </h3>
+                    <div className="space-y-2">
+                      {bad.length === 0 ? (
+                        <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-4`}>No shots below average</div>
+                      ) : (
+                        bad.map((shot, idx) => (
+                          <div key={idx} className={`${darkMode ? 'bg-red-900/30 border-red-800' : 'bg-red-50 border-red-200'} border rounded-lg p-3`}>
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className={`${darkMode ? 'text-red-300' : 'text-red-800'} font-semibold`}>{shot.playerName}</div>
+                                <div className={`${darkMode ? 'text-red-400' : 'text-red-700'} text-sm`}>{shot.area}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`${darkMode ? 'text-red-300' : 'text-red-800'} font-bold`}>{shot.pps.toFixed(2)} PPS</div>
+                                <div className={`${darkMode ? 'text-red-400' : 'text-red-700'} text-sm`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rebounds & Turnovers */}
+              {teamStats && (
+                <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
+                  <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>Rebounds & Turnovers</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} border-b-2 ${darkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                          <th className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} p-3 text-center font-semibold`}>Conquerors</th>
+                          <th className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} p-3 text-center font-semibold`}>Stat</th>
+                          <th className={`${darkMode ? 'text-gray-200' : 'text-gray-700'} p-3 text-center font-semibold`}>Opponent</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className={`${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b`}>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.conquers.offReb}</td>
+                          <td className={`${darkMode ? 'text-gray-200' : 'text-gray-800'} p-3 text-center font-semibold`}>Offensive Rebounds</td>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.opponent.offReb}</td>
+                        </tr>
+                        <tr className={`${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b`}>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center`}>{teamStats.conquers.offRebPct.toFixed(1)}%</td>
+                          <td className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} p-3 text-center text-xs`}>Off. Reb %</td>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center`}>{teamStats.opponent.offRebPct.toFixed(1)}%</td>
+                        </tr>
+                        <tr className={`${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b`}>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.conquers.defReb}</td>
+                          <td className={`${darkMode ? 'text-gray-200' : 'text-gray-800'} p-3 text-center font-semibold`}>Defensive Rebounds</td>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.opponent.defReb}</td>
+                        </tr>
+                        <tr className={`${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b`}>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center`}>{teamStats.conquers.defRebPct.toFixed(1)}%</td>
+                          <td className={`${darkMode ? 'text-gray-400' : 'text-gray-600'} p-3 text-center text-xs`}>Def. Reb %</td>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center`}>{teamStats.opponent.defRebPct.toFixed(1)}%</td>
+                        </tr>
+                        <tr className={`${darkMode ? 'border-gray-700' : 'border-gray-200'} border-b`}>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.conquers.turnovers}</td>
+                          <td className={`${darkMode ? 'text-gray-200' : 'text-gray-800'} p-3 text-center font-semibold`}>Turnovers</td>
+                          <td className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} p-3 text-center font-medium`}>{teamStats.opponent.turnovers}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
