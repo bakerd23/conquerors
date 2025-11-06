@@ -134,7 +134,7 @@
           const player = players.find(p => p.id === playerId);
           if (!player) return;
 
-          const playerName = `${player.firstName} ${player.lastName}`.trim() || `#${player.number}`;
+          const playerName = `${player.firstName}`
           const row = { playerId, playerName, number: player.number };
 
           AREAS.forEach(area => {
