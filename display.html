@@ -74,23 +74,16 @@
       useEffect(() => { document.body.className = darkMode ? 'dark-mode' : 'light-mode'; }, [darkMode]);
 
       const loadGames = useCallback(() => {
-        // Set up real-time listener
         const unsubscribe = db.collection('gameSummaries').onSnapshot(snapshot => {
           const gamesList = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })).sort((a, b) => {
-            // Sort by date descending, then by opponent
-            if (a.gameDate !== b.gameDate) {
-              return b.gameDate.localeCompare(a.gameDate);
-            }
+            if (a.gameDate !== b.gameDate) return b.gameDate.localeCompare(a.gameDate);
             return (a.opponent || '').localeCompare(b.opponent || '');
           });
           setGames(gamesList);
-        }, error => {
-          console.error('Error loading games:', error);
-        });
-
+        }, error => console.error('Error loading games:', error));
         return unsubscribe;
       }, []);
 
@@ -100,23 +93,11 @@
       }, [loadGames]);
 
       const loadGameData = useCallback(() => {
-        if (!selectedGameId) {
-          setGameData(null);
-          return;
-        }
-
-        // Set up real-time listener for selected game
+        if (!selectedGameId) { setGameData(null); return; }
         const unsubscribe = db.collection('gameSummaries').doc(selectedGameId).onSnapshot(snap => {
-          if (snap.exists) {
-            setGameData(snap.data());
-          } else {
-            setGameData(null);
-          }
-        }, error => {
-          console.error('Error loading game data:', error);
-          setGameData(null);
-        });
-
+          if (snap.exists) setGameData(snap.data());
+          else setGameData(null);
+        }, error => { console.error('Error loading game data:', error); setGameData(null); });
         return unsubscribe;
       }, [selectedGameId]);
 
@@ -127,196 +108,114 @@
 
       const getPlayerStats = () => {
         if (!gameData || !gameData.playerStats) return [];
-        
         const stats = [];
         Object.entries(gameData.playerStats).forEach(([playerKey, playerData]) => {
           const playerId = parseInt(playerKey.replace('player_', ''), 10);
           const player = players.find(p => p.id === playerId);
           if (!player) return;
-
-          const playerName = `${player.firstName}`
-          const row = { playerId, playerName, number: player.number };
-
+          const row = { playerId, playerName: `${player.firstName}`, number: player.number };
           AREAS.forEach(area => {
             const makes = playerData[`Makes:${area.key}`] || 0;
             const misses = playerData[`Misses:${area.key}`] || 0;
             const attempts = makes + misses;
             const pct = attempts > 0 ? (makes / attempts * 100) : 0;
             const pps = attempts > 0 ? (makes / attempts * area.points) : 0;
-            
             row[area.key] = { makes, attempts, pct, pps, points: area.points };
           });
-
           stats.push(row);
         });
-
         return stats;
       };
 
       const getTeamPPS = (area) => {
         const stats = getPlayerStats();
-        let totalMakes = 0;
-        let totalAttempts = 0;
-        
+        let totalMakes = 0, totalAttempts = 0;
         stats.forEach(player => {
-          const areaStats = player[area.key];
-          if (areaStats) {
-            totalMakes += areaStats.makes;
-            totalAttempts += areaStats.attempts;
-          }
+          const a = player[area.key];
+          if (a) { totalMakes += a.makes; totalAttempts += a.attempts; }
         });
-
         if (totalAttempts === 0) return 0;
         return (totalMakes / totalAttempts) * area.points;
-      };
+        };
 
       const getAveragePPS = () => {
         const stats = getPlayerStats();
-        let totalPoints = 0;
-        let totalAttempts = 0;
-
+        let totalPoints = 0, totalAttempts = 0;
         stats.forEach(player => {
           AREAS.forEach(area => {
-            const areaStats = player[area.key];
-            if (areaStats && areaStats.attempts > 0) {
-              totalPoints += areaStats.makes * areaStats.points;
-              totalAttempts += areaStats.attempts;
+            const a = player[area.key];
+            if (a && a.attempts > 0) {
+              totalPoints += a.makes * a.points;
+              totalAttempts += a.attempts;
             }
           });
         });
-
         return totalAttempts > 0 ? totalPoints / totalAttempts : 0;
       };
 
-      {/* Good Shots / Bad Shots — COMPACT */}
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-4 mb-6`}>
-        <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-lg font-semibold mb-3`}>
-          Shot Quality (Team Avg: {getAveragePPS().toFixed(2)} PPS)
-        </h2>
-      
-        {/* helper chip renderer */}
-        {(() => {
-          const Chip = ({ shot, positive }) => {
-            const shell = positive
-              ? (darkMode ? 'bg-green-900/30 border-green-800' : 'bg-green-50 border-green-200')
-              : (darkMode ? 'bg-red-900/30 border-red-800'   : 'bg-red-50 border-red-200');
-      
-            const name = positive
-              ? (darkMode ? 'text-green-200' : 'text-green-800')
-              : (darkMode ? 'text-red-200'   : 'text-red-800');
-      
-            const meta = positive
-              ? (darkMode ? 'text-green-400' : 'text-green-700')
-              : (darkMode ? 'text-red-400'   : 'text-red-700');
-      
-            const badge = positive
-              ? (darkMode ? 'bg-green-800 text-green-100' : 'bg-green-200 text-green-900')
-              : (darkMode ? 'bg-red-800 text-red-100'     : 'bg-red-200 text-red-900');
-      
-            return (
-              <div className={`border rounded-md ${shell} p-2`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className={`truncate ${name} text-xs font-semibold`}>{shot.playerName}</div>
-                  <div className={`text-[10px] px-2 py-0.5 rounded-full ${badge} whitespace-nowrap`}>{shot.area}</div>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[11px]">
-                  <div className={`${meta} font-medium`}>{shot.pps.toFixed(2)} PPS</div>
-                  <div className={`${meta}`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
-                </div>
-              </div>
-            );
-          };
-      
-          return (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Good */}
-              <div>
-                <h3 className={`${darkMode ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'} text-sm font-semibold text-center py-1.5 px-3 rounded-md mb-2`}>
-                  Good Shots
-                </h3>
-                {good.length === 0 ? (
-                  <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-3 text-sm`}>None above average</div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
-                    {good.map((shot, i) => <Chip key={`good-${i}`} shot={shot} positive />)}
-                  </div>
-                )}
-              </div>
-      
-              {/* Bad */}
-              <div>
-                <h3 className={`${darkMode ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800'} text-sm font-semibold text-center py-1.5 px-3 rounded-md mb-2`}>
-                  Bad Shots
-                </h3>
-                {bad.length === 0 ? (
-                  <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-3 text-sm`}>None below average</div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
-                    {bad.map((shot, i) => <Chip key={`bad-${i}`} shot={shot} />)}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+      // ✅ You accidentally removed this. Restored:
+      const getGoodBadShots = () => {
+        const stats = getPlayerStats();
+        const avgPPS = getAveragePPS();
+        const good = [], bad = [];
+        stats.forEach(player => {
+          AREAS.forEach(area => {
+            if (area.key === "Free Throw") return;
+            const a = player[area.key];
+            if (a && a.attempts > 0) {
+              const shot = {
+                playerName: player.playerName,
+                area: area.label,
+                pps: a.pps,
+                makes: a.makes,
+                attempts: a.attempts,
+                pct: a.pct
+              };
+              if (a.pps > avgPPS) good.push(shot);
+              else if (a.pps < avgPPS) bad.push(shot);
+            }
+          });
+        });
+        good.sort((x, y) => y.pps - x.pps);
+        bad.sort((x, y) => x.pps - y.pps);
+        return { good, bad };
+      };
 
       const getTeamStats = () => {
         if (!gameData || !gameData.teamStats) return null;
-
         const conquers = {
           offReb: gameData.teamStats['Conquerors:Offensive Rebound'] || 0,
           defReb: gameData.teamStats['Conquerors:Defensive Rebound'] || 0,
           turnovers: gameData.teamStats['Conquerors:Turnover'] || 0
         };
-
         const opponent = {
           offReb: gameData.teamStats['Opponent:Offensive Rebound'] || 0,
           defReb: gameData.teamStats['Opponent:Defensive Rebound'] || 0,
           turnovers: gameData.teamStats['Opponent:Turnover'] || 0
         };
-
         const totalOffReb = conquers.offReb + opponent.defReb;
         const totalDefReb = conquers.defReb + opponent.offReb;
-
         conquers.offRebPct = totalOffReb > 0 ? (conquers.offReb / totalOffReb * 100) : 0;
         conquers.defRebPct = totalDefReb > 0 ? (conquers.defReb / totalDefReb * 100) : 0;
         opponent.offRebPct = totalOffReb > 0 ? (opponent.offReb / totalOffReb * 100) : 0;
         opponent.defRebPct = totalDefReb > 0 ? (opponent.defReb / totalDefReb * 100) : 0;
-
         return { conquers, opponent };
       };
 
       const sortData = (data, key) => {
         if (!data || data.length === 0) return data;
-
         const direction = sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc';
         setSortConfig({ key, direction });
-
         return [...data].sort((a, b) => {
           let aVal, bVal;
-
           if (key === 'playerName') {
-            aVal = a.playerName;
-            bVal = b.playerName;
+            aVal = a.playerName; bVal = b.playerName;
           } else {
-            // Sorting by area stats
             const [area, type] = key.split('-');
-            const areaData = AREAS.find(ar => ar.key === area);
-            if (!areaData) return 0;
-
-            const aStats = a[area];
-            const bStats = b[area];
-
-            if (!aStats || aStats.attempts === 0) aVal = -1;
-            else if (type === 'makes') aVal = aStats.makes;
-            else if (type === 'pct') aVal = aStats.pct;
-
-            if (!bStats || bStats.attempts === 0) bVal = -1;
-            else if (type === 'makes') bVal = bStats.makes;
-            else if (type === 'pct') bVal = bStats.pct;
+            const aStats = a[area], bStats = b[area];
+            aVal = (!aStats || aStats.attempts === 0) ? -1 : (type === 'makes' ? aStats.makes : aStats.pct);
+            bVal = (!bStats || bStats.attempts === 0) ? -1 : (type === 'makes' ? bStats.makes : bStats.pct);
           }
-
           if (aVal < bVal) return direction === 'asc' ? -1 : 1;
           if (aVal > bVal) return direction === 'asc' ? 1 : -1;
           return 0;
@@ -331,9 +230,7 @@
       const playerStats = getPlayerStats();
       const [sortedStats, setSortedStats] = useState(playerStats);
 
-      useEffect(() => {
-        setSortedStats(playerStats);
-      }, [gameData]);
+      useEffect(() => { setSortedStats(playerStats); }, [gameData]);
 
       const handleSort = (key) => {
         const sorted = sortData(sortedStats, key);
@@ -353,9 +250,9 @@
               </div>
               <div className="flex items-center gap-2">
                 <label className={`${darkMode ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium whitespace-nowrap`}>Select Game:</label>
-                <select 
-                  value={selectedGameId} 
-                  onChange={e=>setSelectedGameId(e.target.value)} 
+                <select
+                  value={selectedGameId}
+                  onChange={e=>setSelectedGameId(e.target.value)}
                   className={`${darkMode ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'} px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1`}
                 >
                   <option value="">-- Select a game --</option>
@@ -430,63 +327,74 @@
                 </table>
               </div>
 
-              {/* Good Shots / Bad Shots */}
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
-                <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-xl font-semibold mb-4`}>
-                  Shot Quality Analysis (Team Avg: {getAveragePPS().toFixed(2)} PPS)
+              {/* Good Shots / Bad Shots — COMPACT */}
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-4 mb-6`}>
+                <h2 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-lg font-semibold mb-3`}>
+                  Shot Quality (Team Avg: {getAveragePPS().toFixed(2)} PPS)
                 </h2>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className={`${darkMode ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg mb-3`}>
-                      Good Shots (Above Average)
-                    </h3>
-                    <div className="space-y-2">
-                      {good.length === 0 ? (
-                        <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-4`}>No shots above average</div>
-                      ) : (
-                        good.map((shot, idx) => (
-                          <div key={idx} className={`${darkMode ? 'bg-green-900/30 border-green-800' : 'bg-green-50 border-green-200'} border rounded-lg p-3`}>
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <div className={`${darkMode ? 'text-green-300' : 'text-green-800'} font-semibold`}>{shot.playerName}</div>
-                                <div className={`${darkMode ? 'text-green-400' : 'text-green-700'} text-sm`}>{shot.area}</div>
-                              </div>
-                              <div className="text-right">
-                                <div className={`${darkMode ? 'text-green-300' : 'text-green-800'} font-bold`}>{shot.pps.toFixed(2)} PPS</div>
-                                <div className={`${darkMode ? 'text-green-400' : 'text-green-700'} text-sm`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
-                              </div>
-                            </div>
+
+                {(() => {
+                  const Chip = ({ shot, positive }) => {
+                    const shell = positive
+                      ? (darkMode ? 'bg-green-900/30 border-green-800' : 'bg-green-50 border-green-200')
+                      : (darkMode ? 'bg-red-900/30 border-red-800'   : 'bg-red-50 border-red-200');
+
+                    const name = positive
+                      ? (darkMode ? 'text-green-200' : 'text-green-800')
+                      : (darkMode ? 'text-red-200'   : 'text-red-800');
+
+                    const meta = positive
+                      ? (darkMode ? 'text-green-400' : 'text-green-700')
+                      : (darkMode ? 'text-red-400'   : 'text-red-700');
+
+                    const badge = positive
+                      ? (darkMode ? 'bg-green-800 text-green-100' : 'bg-green-200 text-green-900')
+                      : (darkMode ? 'bg-red-800 text-red-100'     : 'bg-red-200 text-red-900');
+
+                    return (
+                      <div className={`border rounded-md ${shell} p-2`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className={`truncate ${name} text-xs font-semibold`}>{shot.playerName}</div>
+                          <div className={`text-[10px] px-2 py-0.5 rounded-full ${badge} whitespace-nowrap`}>{shot.area}</div>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between text-[11px]">
+                          <div className={`${meta} font-medium`}>{shot.pps.toFixed(2)} PPS</div>
+                          <div className={`${meta}`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div>
+                        <h3 className={`${darkMode ? 'bg-green-700 text-green-100' : 'bg-green-100 text-green-800'} text-sm font-semibold text-center py-1.5 px-3 rounded-md mb-2`}>
+                          Good Shots
+                        </h3>
+                        {good.length === 0 ? (
+                          <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-3 text-sm`}>None above average</div>
+                        ) : (
+                          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                            {good.map((shot, i) => <Chip key={`good-${i}`} shot={shot} positive />)}
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className={`${darkMode ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg mb-3`}>
-                      Bad Shots (Below Average)
-                    </h3>
-                    <div className="space-y-2">
-                      {bad.length === 0 ? (
-                        <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-4`}>No shots below average</div>
-                      ) : (
-                        bad.map((shot, idx) => (
-                          <div key={idx} className={`${darkMode ? 'bg-red-900/30 border-red-800' : 'bg-red-50 border-red-200'} border rounded-lg p-3`}>
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <div className={`${darkMode ? 'text-red-300' : 'text-red-800'} font-semibold`}>{shot.playerName}</div>
-                                <div className={`${darkMode ? 'text-red-400' : 'text-red-700'} text-sm`}>{shot.area}</div>
-                              </div>
-                              <div className="text-right">
-                                <div className={`${darkMode ? 'text-red-300' : 'text-red-800'} font-bold`}>{shot.pps.toFixed(2)} PPS</div>
-                                <div className={`${darkMode ? 'text-red-400' : 'text-red-700'} text-sm`}>{shot.makes}-{shot.attempts} ({shot.pct.toFixed(1)}%)</div>
-                              </div>
-                            </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className={`${darkMode ? 'bg-red-700 text-red-100' : 'bg-red-100 text-red-800'} text-sm font-semibold text-center py-1.5 px-3 rounded-md mb-2`}>
+                          Bad Shots
+                        </h3>
+                        {bad.length === 0 ? (
+                          <div className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center py-3 text-sm`}>None below average</div>
+                        ) : (
+                          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2">
+                            {bad.map((shot, i) => <Chip key={`bad-${i}`} shot={shot} />)}
                           </div>
-                        ))
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Rebounds & Turnovers */}
