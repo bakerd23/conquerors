@@ -292,28 +292,28 @@
         return (
           <div className={`flex items-center justify-between p-3 rounded-lg border ${isConquerors
             ? (darkMode ? 'bg-purple-900/50 border-purple-800' : 'bg-purple-50 border-purple-200')
-            : (darkMode ? 'bg-blue-900/50 border-blue-800' : 'bg-blue-50 border-blue-200')}`}>
+            : (darkMode ? 'bg-orange-900/50 border-blue-800' : 'bg-orange-50 border-blue-200')}`}>
             <div className={`text-sm font-medium ${isConquerors
               ? (darkMode ? 'text-purple-300' : 'text-purple-800')
-              : (darkMode ? 'text-blue-300' : 'text-blue-800')}`}>{stat}</div>
+              : (darkMode ? 'text-orange-300' : 'text-orange-800')}`}>{stat}</div>
             <div className="flex items-center gap-2">
               <button onClick={() => updateTeamStat(side, stat, -1)} disabled={v===0 || !opponent}
                 className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${v===0 || !opponent
                   ? 'bg-gray-300 cursor-not-allowed'
                   : (isConquerors
                       ? 'bg-purple-500 hover:bg-purple-600 active:bg-purple-700'
-                      : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700')}`}>−</button>
+                      : 'bg-orange-400 hover:bg-orange-500 active:bg-orange-700')}`}>−</button>
 
               <div className={`${isConquerors
                 ? (darkMode ? 'text-purple-300' : 'text-purple-700')
-                : (darkMode ? 'text-blue-300' : 'text-blue-700')} w-12 text-center font-bold text-lg`}>{v}</div>
+                : (darkMode ? 'text-orange-300' : 'text-orange-700')} w-12 text-center font-bold text-lg`}>{v}</div>
 
               <button onClick={() => updateTeamStat(side, stat, 1)} disabled={!opponent}
                 className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${!opponent
                   ? 'bg-gray-300 cursor-not-allowed'
                   : (isConquerors
                       ? 'bg-purple-500 hover:bg-purple-600 active:bg-purple-700'
-                      : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700')}`}>+</button>
+                      : 'bg-orange-400 hover:bg-orange-500 active:bg-orange-700')}`}>+</button>
             </div>
           </div>
         );
@@ -405,7 +405,7 @@
                     </div>
 
                     <div className="space-y-3">
-                      <h3 className={`${darkMode ? 'bg-blue-700 text-blue-100' : 'bg-blue-100 text-blue-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg`}>Opponent</h3>
+                      <h3 className={`${darkMode ? 'bg-orange-600 text-orange-100' : 'bg-orange-100 text-orange-800'} text-lg font-semibold text-center py-2 px-4 rounded-lg`}>Opponent</h3>
                       {TEAM_STATS.map(stat => (
                         <TeamStatRow key={`opp-${stat}`} side="Opponent" stat={stat} />
                       ))}
