@@ -195,10 +195,10 @@
         };
         const totalOffReb = conquers.offReb + opponent.defReb;
         const totalDefReb = conquers.defReb + opponent.offReb;
-        conquers.offRebPct = totalOffReb > 0 ? (conquers.offReb / totalOffReb * 100) : 0;
-        conquers.defRebPct = totalDefReb > 0 ? (conquers.defReb / totalDefReb * 100) : 0;
-        opponent.offRebPct = totalOffReb > 0 ? (opponent.offReb / totalOffReb * 100) : 0;
-        opponent.defRebPct = totalDefReb > 0 ? (opponent.defReb / totalDefReb * 100) : 0;
+        conquers.offRebPct = totalOffReb > 0 ? (conquers.offReb / (conquers.offReb + opponent.defReb) * 100) : 0;
+        conquers.defRebPct = totalDefReb > 0 ? (conquers.defReb / (conquers.defReb + opponent.offReb) * 100) : 0;
+        opponent.offRebPct = totalOffReb > 0 ? (opponent.offReb / (opponent.offReb + conquers.defReb) * 100) : 0;
+        opponent.defRebPct = totalDefReb > 0 ? (opponent.defReb / (opponent.defReb + conquers.offReb) * 100) : 0;
         return { conquers, opponent };
       };
 
