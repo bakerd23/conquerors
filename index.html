@@ -47,7 +47,7 @@
       { id: 12, number: 12, firstName: "Kale"},
       { id: 15, number: 15, firstName: "Machen"},
       { id: 20, number: 20, firstName: "James"},
-      { id: 21, number: 21, firstName: "Titus"},
+      { id: 21, number: 51, firstName: "Titus"},
       { id: 22, number: 22, firstName: "Charlie"},
       { id: 23, number: 23, firstName: "Rylan"},
       { id: 33, number: 33, firstName: "Zach"},
@@ -75,7 +75,7 @@
 
       useEffect(() => { document.body.className = darkMode ? 'dark-mode' : 'light-mode'; }, [darkMode]);
 
-      const getGameId = () => `${gameDate}-${opponent.replace(/\s+/g, '-').toLowerCase()}`;
+      const getGameId = () => `${gameDate}-${opponent.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}`;
       const getPlayerKey = (id) => `${getGameId()}-p${id}`;
       const getTeamKey = () => `${getGameId()}-team`;
       const getStatValue = useCallback((id, cat, stat) => playerStats[getPlayerKey(id)]?.[`${cat}:${stat}`] || 0, [playerStats, gameDate, opponent]);
@@ -240,51 +240,51 @@
       };
 
       const StatRow = ({ id, cat, stat }) => {
-  const v = getStatValue(id, cat, stat);
-  const isMiss = cat === 'Misses';
-  return (
-    <div className={`flex items-center justify-between p-3 rounded-lg border ${
-      isMiss
-        ? (darkMode ? 'bg-red-900/50 border-red-800' : 'bg-red-50 border-red-200')
-        : (darkMode ? 'bg-green-900/50 border-green-800' : 'bg-green-50 border-green-200')
-    }`}>
-      <div className={`text-sm font-medium ${
-        isMiss ? (darkMode ? 'text-red-300' : 'text-red-800')
-               : (darkMode ? 'text-green-300' : 'text-green-800')
-      }`}>{stat}</div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => updateStat(id, cat, stat, -1)}
-          disabled={v===0 || !opponent}
-          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
-            v===0 || !opponent
-              ? 'bg-gray-300 cursor-not-allowed'
-              : (isMiss
-                  ? 'bg-green-500 hover:bg-green-600 active:bg-green-700'  // undo bad swap
-                  : 'bg-red-500 hover:bg-red-600 active:bg-red-700')
-          }`}
-        >−</button>
+        const v = getStatValue(id, cat, stat);
+        const isMiss = cat === 'Misses';
+        return (
+          <div className={`flex items-center justify-between p-3 rounded-lg border ${
+            isMiss
+              ? (darkMode ? 'bg-red-900/50 border-red-800' : 'bg-red-50 border-red-200')
+              : (darkMode ? 'bg-green-900/50 border-green-800' : 'bg-green-50 border-green-200')
+          }`}>
+            <div className={`text-sm font-medium ${
+              isMiss ? (darkMode ? 'text-red-300' : 'text-red-800')
+                     : (darkMode ? 'text-green-300' : 'text-green-800')
+            }`}>{stat}</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateStat(id, cat, stat, -1)}
+                disabled={v===0 || !opponent}
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                  v===0 || !opponent
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : (isMiss
+                        ? 'bg-green-500 hover:bg-green-600 active:bg-green-700'
+                        : 'bg-red-500 hover:bg-red-600 active:bg-red-700')
+                }`}
+              >−</button>
 
-        <div className={`w-12 text-center font-bold text-lg ${
-          isMiss ? (darkMode ? 'text-red-300' : 'text-red-700')
-                 : (darkMode ? 'text-green-300' : 'text-green-700')
-        }`}>{v}</div>
+              <div className={`w-12 text-center font-bold text-lg ${
+                isMiss ? (darkMode ? 'text-red-300' : 'text-red-700')
+                       : (darkMode ? 'text-green-300' : 'text-green-700')
+              }`}>{v}</div>
 
-        <button
-          onClick={() => updateStat(id, cat, stat, 1)}
-          disabled={!opponent}
-          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
-            !opponent
-              ? 'bg-gray-300 cursor-not-allowed'
-              : (isMiss
-                  ? 'bg-red-500 hover:bg-red-600 active:bg-red-700'
-                  : 'bg-green-500 hover:bg-green-600 active:bg-green-700')
-          }`}
-        >+</button>
-      </div>
-    </div>
-  );
-};
+              <button
+                onClick={() => updateStat(id, cat, stat, 1)}
+                disabled={!opponent}
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                  !opponent
+                    ? 'bg-gray-300 cursor-not-allowed'
+                    : (isMiss
+                        ? 'bg-red-500 hover:bg-red-600 active:bg-red-700'
+                        : 'bg-green-500 hover:bg-green-600 active:bg-green-700')
+                }`}
+              >+</button>
+            </div>
+          </div>
+        );
+      };
 
       const TeamStatRow = ({ side, stat }) => {
         const v = getTeamStatValue(side, stat);
@@ -324,7 +324,10 @@
           <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6 mb-6`}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h1 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-2xl font-bold`}>Game Input — Makes/Misses</h1>
+                <div>
+                  <h1 className={`${darkMode ? 'text-white' : 'text-gray-800'} text-2xl font-bold`}>Game Input — Makes/Misses</h1>
+                  <div className={`${darkMode ? 'text-gray-500' : 'text-gray-400'} text-xs`}>v1.3 - Fixed</div>
+                </div>
                 <div className="flex items-center gap-4">
                   <a href="game-stats-viewer.html"
                      className={`${darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-500 hover:bg-purple-600 text-white'} px-4 py-2 rounded-md font-medium transition-colors`}>
